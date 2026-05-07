@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sandbox SDN - 5G Core</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, sans-serif; background: #f1f5f9; padding: 20px; color: #334155; margin: 0; }
+        .grid { display: grid; grid-template-columns: 320px 1fr 1fr; gap: 20px; height: 95vh; }
+        
+        .controls { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); overflow-y: auto; }
+        .console-box { background: #0f172a; border-radius: 10px; padding: 15px; display: flex; flex-direction: column; overflow: hidden; }
+        .console-header { color: #94a3b8; border-bottom: 1px solid #334155; padding-bottom: 10px; margin-bottom: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center;}
+        .console-output { flex: 1; font-family: 'Consolas', monospace; font-size: 0.85rem; overflow-y: auto; white-space: pre-wrap; line-height: 1.4;}
+        
+        #smf-output { color: #38bdf8; } 
+        #upf-output { color: #4ade80; } 
+
+        .control-group { background: #f8fafc; border: 1px solid #e2e8f0; padding: 15px; border-radius: 8px; margin-bottom: 15px; }
+        .control-group h3 { font-size: 0.95rem; margin-top: 0; margin-bottom: 10px; color: #1e293b; border-bottom: 2px solid #e2e8f0; padding-bottom: 5px;}
+        
+        .input-row { display: flex; gap: 10px; margin-bottom: 10px; }
+        .input-col { flex: 1; display: flex; flex-direction: column; }
+        label { font-size: 0.75rem; font-weight: bold; color: #64748b; margin-bottom: 4px; }
+        input, select { padding: 8px; border: 1px solid #cbd5e1; border-radius: 4px; font-size: 0.85rem; outline: none; background: white; }
+        input:focus, select:focus { border-color: #2563eb; }
+
+        button { width: 100%; padding: 10px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; background: #2563eb; color: white; transition: all 0.2s; font-size: 0.9rem;}
+        button:hover { background: #1d4ed8; transform: translateY(-1px); }
+        button.btn-danger { background: #ef4444; }
+        button.btn-danger:hover { background: #dc2626; }
+
+        h2 { font-size: 1.3rem; margin-top: 0; color: #0f172a; margin-bottom: 5px;}
+        .subtitle { font-size: 0.8rem; color: #64748b; margin-bottom: 20px; }
+        
+        .terminal-filter { display: flex; align-items: center; gap: 10px; }
+        .terminal-filter input { padding: 4px 8px; width: 80px; font-size: 0.8rem; margin:0; background: #1e293b; color: #4ade80; border: 1px solid #334155; font-weight: bold; text-align: center;}
+
+        /* Nuevos Estilos para los Usuarios Activos */
+        .active-users { background: #e0f2fe; border: 1px solid #bae6fd; padding: 15px; border-radius: 8px; margin-top: 15px; }
+        .active-users h3 { font-size: 0.95rem; margin-top: 0; margin-bottom: 10px; color: #0369a1; border-bottom: 2px solid #bae6fd; padding-bottom: 5px;}
+        .user-badge { display: inline-block; background: #ffffff; color: #0284c7; padding: 5px 10px; border-radius: 20px; font-size: 0.8rem; margin: 3px; font-weight: bold; cursor: pointer; border: 1px solid #7dd3fc; transition: all 0.2s; box-shadow: 0 1px 2px rgba(0,0,0,0.05);}
+        .user-badge:hover { background: #0284c7; color: white; transform: translateY(-2px); box-shadow: 0 4px 6px rgba(2, 132, 199, 0.2); }
+        .user-badge.empty { background: transparent; color: #64748b; border: 1px dashed #94a3b8; cursor: default; font-weight: normal; box-shadow: none; }
+        .user-badge.empty:hover { background: transparent; color: #64748b; transform: none; box-shadow: none; }
+    </style>
+</head>
+<body>
+
+<div class="grid">
+    <!-- PANEL DE CONTROL AVANZADO -->
+    <div class="controls">
+        <h2>Orquestador SDN</h2>
+        <div class="subtitle">Laboratorio 5G - Programabilidad PFCP</div>
+
+        <div class="control-group">
+            <h3>1. Asociación N4</h3>
+            <div class="input-row">
+                <div class="input-col">
+                    <label>IP del Servidor UPF:</label>
+                    <input type="text" id="node-ip" value="127.0.0.1">
+                </div>
+            </div>
+            <button onclick="runStep('associate')">🔄 Establecer Control</button>
+        </div>
+
+        <div class="control-group">
+            <h3>2. Nueva Sesión de Usuario</h3>
+            <div class="input-row">
+                <div class="input-col">
+                    <label>Asignar F-SEID:</label>
+                    <input type="number" id="create-seid" value="1001">
+                </div>
+                <div class="input-col">
+                    <label>IP Móvil (PDI):</label>
+                    <input type="text" id="ue-ip" value="192.168.100.1">
+                </div>
+            </div>
+            <!-- Nuevo Campo para Nombre -->
+            <div class="input-row">
+                <div class="input-col">
+                    <label>Nombre Identificativo (Opcional):</label>
+                    <input type="text" id="ue-name" placeholder="Ej: Javier">
+                </div>
+            </div>
+            <button onclick="runStep('establish')" style="background: #10b981;">📱 Crear Túnel PFCP</button>
+        </div>
+
+        <div class="control-group">
+            <h3>3. Inyección de Reglas (FAR / QER)</h3>
+            <div class="input-row">
+                <div class="input-col">
+                    <label>ID a Modificar (SEID):</label>
+                    <input type="number" id="target-seid" value="1001">
+                </div>
+            </div>
+            <div class="input-row">
+                <div class="input-col">
+                    <label>Acción de Red (FAR):</label>
+                    <select id="far-action">
+                        <option value="forw">🟢 FORWARD (Permitir tráfico)</option>
+                        <option value="drop">🔴 DROP (Bloquear/Ataque)</option>
+                        <option value="buff">🟡 BUFFER (Retener paquetes)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="input-row">
+                <div class="input-col">
+                    <label>Calidad de Servicio (QER - MBR):</label>
+                    <select id="qer-mbr">
+                        <option value="10000000">🚀 10 Mbps (Streaming 4K)</option>
+                        <option value="1000000">🚗 1 Mbps (Navegación Básica)</option>
+                        <option value="64000">🐢 64 Kbps (Velocidad Restringida)</option>
+                    </select>
+                </div>
+            </div>
+            <button onclick="runStep('modify')" style="background: #f59e0b;">⚙️ Reprogramar UPF</button>
+        </div>
+
+        <div class="control-group">
+            <h3>4. Eliminación</h3>
+            <div class="input-row">
+                <div class="input-col">
+                    <label>SEID a Eliminar:</label>
+                    <input type="number" id="delete-seid" value="1001">
+                </div>
+            </div>
+            <button onclick="runStep('delete')" class="btn-danger">🗑️ Destruir Contexto</button>
+        </div>
+
+        <!-- Nuevo Panel Visual de Usuarios Activos -->
+        <div class="active-users">
+            <h3>👥 Sesiones Activas (<span id="active-count">0</span>)</h3>
+            <div id="active-users-list">
+                <span class="user-badge empty">No hay sesiones activas</span>
+            </div>
+        </div>
+        
+    </div>
+
+    <!-- CONSOLA SMF -->
+    <div class="console-box">
+        <div class="console-header">
+            <span>PLANO DE CONTROL (SMF)</span>
+        </div>
+        <div id="smf-output" class="console-output">> Panel de operador listo. Seleccione parámetros...</div>
+    </div>
+
+    <!-- CONSOLA UPF -->
+    <div class="console-box">
+        <div class="console-header">
+            <span>PLANO DE USUARIO (UPF)</span>
+            <div class="terminal-filter">
+                <label style="color: #94a3b8; margin:0;">Viendo SEID:</label>
+                <input type="number" id="monitor-seid" value="1001" title="Cambia el ID para filtrar trazas">
+            </div>
+        </div>
+        <div id="upf-output" class="console-output">> UPF Iniciado. Trazas filtradas por contexto...</div>
+    </div>
+</div>
+
+<script>
+    let lastUpfLogCount = 0;
+    
+    // Almacenamiento histórico de transacciones UPF
+    let allTransactions = [];
+    let upfTransactionBuffer = [];
+
+    // Almacenamiento local de Usuarios Activos (Gestión de Estado Frontend)
+    let activeSessions = {};
+
+    function log(elementId, text) {
+        const el = document.getElementById(elementId);
+        const time = new Date().toLocaleTimeString();
+        el.innerText += `\n[${time}] ${text}`;
+        el.scrollTop = el.scrollHeight;
+    }
+
+    // Funcionalidad para actualizar el panel visual de usuarios
+    function renderActiveUsers() {
+        const list = document.getElementById('active-users-list');
+        const count = document.getElementById('active-count');
+        const seids = Object.keys(activeSessions);
+        
+        count.innerText = seids.length;
+        
+        if (seids.length === 0) {
+            list.innerHTML = '<span class="user-badge empty">No hay sesiones activas</span>';
+            return;
+        }
+        
+        list.innerHTML = '';
+        seids.forEach(seid => {
+            const user = activeSessions[seid];
+            const displayName = user.name ? `${user.name} (${seid})` : `ID: ${seid}`;
+            
+            // Cada etiqueta es un botón que auto-rellena la interfaz
+            list.innerHTML += `<span class="user-badge" onclick="focusOnUser('${seid}')" title="Monitorizar a ${displayName}">🟢 ${displayName}</span>`;
+        });
+    }
+
+    // Funcionalidad UX: Al hacer clic en un usuario, autocompletar todo
+    function focusOnUser(seid) {
+        document.getElementById('target-seid').value = seid;
+        document.getElementById('delete-seid').value = seid;
+        
+        if (document.getElementById('monitor-seid').value !== seid) {
+            document.getElementById('monitor-seid').value = seid;
+            renderUpfConsole();
+        }
+    }
+
+    function renderUpfConsole() {
+        const monitorSeid = document.getElementById('monitor-seid').value;
+        const upfOutput = document.getElementById('upf-output');
+        
+        // Comprobamos si el SEID tiene un nombre guardado para mostrarlo en cabecera
+        let contextName = monitorSeid;
+        if(activeSessions[monitorSeid] && activeSessions[monitorSeid].name) {
+            contextName = `${activeSessions[monitorSeid].name} (SEID: ${monitorSeid})`;
+        }
+
+        upfOutput.innerHTML = `\n----------------------------------------\n> 🔒 CONTEXTO AISLADO\n> Historial y monitorización exclusiva: ${contextName}\n----------------------------------------`;
+        
+        allTransactions.forEach(t => {
+            const blockText = t.lines.map(l => l.text).join(' ');
+            let isMyTransaction = false;
+
+            if (monitorSeid && blockText.includes(monitorSeid)) {
+                isMyTransaction = true;
+            } else if ((blockText.includes("Association") || blockText.includes("Nodo")) && !blockText.includes("SEID")) {
+                isMyTransaction = true;
+            }
+
+            if (isMyTransaction) {
+                t.lines.forEach(line => {
+                    upfOutput.innerHTML += `\n[${line.time}] ${line.text}`;
+                });
+            }
+        });
+        
+        upfOutput.scrollTop = upfOutput.scrollHeight;
+    }
+
+    document.getElementById('monitor-seid').addEventListener('input', function() {
+        renderUpfConsole();
+    });
+
+    async function runStep(action) {
+        let url = `/api/${action}?`;
+        const actionSeid = document.getElementById('create-seid').value;
+        const ueName = document.getElementById('ue-name').value; // Capturamos el nombre
+
+        if (action === 'associate') {
+            url += `node=${document.getElementById('node-ip').value}`;
+        } else if (action === 'establish') {
+            url += `id=${actionSeid}&ip=${document.getElementById('ue-ip').value}`;
+            
+            focusOnUser(actionSeid);
+
+        } else if (action === 'modify') {
+            const mSeid = document.getElementById('target-seid').value;
+            const far = document.getElementById('far-action').value;
+            const mbr = document.getElementById('qer-mbr').value;
+            url += `id=${mSeid}&far=${far}&mbr=${mbr}`;
+            
+            if (document.getElementById('monitor-seid').value !== mSeid) {
+                document.getElementById('monitor-seid').value = mSeid;
+                renderUpfConsole();
+            }
+
+        } else if (action === 'delete') {
+            const dSeid = document.getElementById('delete-seid').value;
+            url += `id=${dSeid}`;
+            
+            if (document.getElementById('monitor-seid').value !== dSeid) {
+                document.getElementById('monitor-seid').value = dSeid;
+                renderUpfConsole();
+            }
+        }
+
+        try {
+            const res = await fetch(url);
+            const data = await res.json();
+            
+            if (data.status === 'success') {
+                log('smf-output', data.message);
+
+                // Lógica de Gestión de Estado: Actualizar usuarios activos según la respuesta
+                if (action === 'establish' && data.seid) {
+                    activeSessions[data.seid] = { 
+                        name: ueName, 
+                        ip: document.getElementById('ue-ip').value 
+                    };
+                    renderActiveUsers();
+                    // Refrescamos la consola para mostrar el nombre si acabamos de establecerlo
+                    renderUpfConsole(); 
+                } 
+                else if (action === 'delete') {
+                    const deletedSeid = document.getElementById('delete-seid').value;
+                    delete activeSessions[deletedSeid];
+                    renderActiveUsers();
+                }
+
+                if (data.message.includes("Error") || data.message.includes("Inexistente")) {
+                    log('smf-output', "⚠️ ALERTA: Verifica el panel del UPF (derecha) para ver el rechazo.");
+                }
+            } else {
+                log('smf-output', "❌ ERROR: " + data.message);
+            }
+        } catch (e) {
+            log('smf-output', "❌ Error de conexión con el SMF.");
+        }
+    }
+
+    function flushUpfBuffer() {
+        if (upfTransactionBuffer.length === 0) return;
+        
+        allTransactions.push({
+            lines: [...upfTransactionBuffer]
+        });
+        upfTransactionBuffer = [];
+        renderUpfConsole();
+    }
+
+    setInterval(async () => {
+        try {
+            const res = await fetch('/api/get-logs');
+            const logs = await res.json();
+            
+            if (logs && logs.length > lastUpfLogCount) {
+                const newLogs = logs.slice(lastUpfLogCount);
+                lastUpfLogCount = logs.length;
+                
+                newLogs.forEach(msg => {
+                    if (msg.includes("[RX]") && upfTransactionBuffer.length > 0) {
+                        flushUpfBuffer();
+                    }
+                    upfTransactionBuffer.push({ 
+                        text: msg, 
+                        time: new Date().toLocaleTimeString() 
+                    });
+                    
+                    if (msg.includes("[TX]") || msg.includes("Rechazando") || msg.includes("Error")) {
+                        flushUpfBuffer();
+                    }
+                });
+                setTimeout(flushUpfBuffer, 100);
+            }
+        } catch (e) {}
+    }, 1000);
+</script>
+
+</body>
+</html>
