@@ -46,9 +46,8 @@ Sigue estos pasos para desplegar el entorno en tu equipo local:
 
 ## 📂 Estructura del Repositorio
 
-* `smf/`: Contiene la lógica del plano de control, la API REST y el cliente PFCP.
+* `smf/`: Contiene la lógica del plano de control, la API REST y el cliente PFCP, además de archivos del frontend (index.html).
 * `upf/`: Contiene la implementación del plano de usuario, el servidor PFCP y el motor de reglas.
-* `static/`: Archivos del frontend (index.html, estilos y scripts de la interfaz).
 * `go.mod` / `go.sum`: Archivos de gestión de dependencias del proyecto.
 
 ---
